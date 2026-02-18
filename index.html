@@ -2,178 +2,199 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Car Racing Game</title>
+<title>Cyber Nitro Racing</title>
 <style>
 body{
     margin:0;
     overflow:hidden;
-    background:#222;
+    background:black;
     font-family:Arial;
     text-align:center;
-    color:white;
+    color:#00ffff;
 }
+
+h1{
+    text-shadow:0 0 10px #00ffff;
+}
+
 #gameArea{
-    width:400px;
-    height:600px;
-    background:#333;
-    margin:20px auto;
+    width:360px;
+    height:650px;
+    margin:10px auto;
     position:relative;
     overflow:hidden;
-    border:5px solid white;
+    background:linear-gradient(to bottom,#111,#000);
+    border:3px solid #00ffff;
+    box-shadow:0 0 20px #00ffff;
 }
-.roadLine{
-    width:10px;
-    height:100px;
-    background:white;
+
+.lane{
     position:absolute;
-    left:195px;
+    width:2px;
+    height:650px;
+    background:#00ffff33;
 }
+
 .car{
-    width:50px;
-    height:90px;
+    width:60px;
+    height:100px;
     position:absolute;
     bottom:20px;
-    background:red;
-    left:175px;
+    left:150px;
+    background:linear-gradient(red,orange);
     border-radius:10px;
+    box-shadow:0 0 15px red;
 }
+
 .enemy{
-    width:50px;
-    height:90px;
+    width:60px;
+    height:100px;
     position:absolute;
-    background:yellow;
+    background:linear-gradient(yellow,orange);
     border-radius:10px;
+    box-shadow:0 0 15px yellow;
 }
-#score{
-    font-size:20px;
-}
-#startBtn{
-    padding:10px 20px;
-    font-size:18px;
+
+button{
+    padding:8px 15px;
+    margin:5px;
     cursor:pointer;
+}
+
+#info{
+    font-size:18px;
 }
 </style>
 </head>
 <body>
 
-<h1>🚗 Car Racing Game</h1>
-<p id="score">Score: 0</p>
-<button id="startBtn">Start Game</button>
+<h1>🚗 CYBER NITRO RACING</h1>
+<div id="info">
+Score: <span id="score">0</span> |
+High Score: <span id="highScore">0</span>
+</div>
 
-<div id="gameArea"></div>
+<button onclick="startGame()">Start</button>
+<button onclick="togglePause()">Pause</button>
+<button onclick="activateNitro()">Nitro ⚡</button>
+
+<div id="gameArea">
+<div class="lane" style="left:120px"></div>
+<div class="lane" style="left:240px"></div>
+</div>
+
+<audio id="bgMusic" loop>
+<source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3">
+</audio>
 
 <script>
-const gameArea = document.getElementById("gameArea");
-const scoreDisplay = document.getElementById("score");
-const startBtn = document.getElementById("startBtn");
+const gameArea=document.getElementById("gameArea");
+const scoreDisplay=document.getElementById("score");
+const highScoreDisplay=document.getElementById("highScore");
+const bgMusic=document.getElementById("bgMusic");
 
-let player = { speed:5, score:0 };
-let keys = { ArrowLeft:false, ArrowRight:false };
+let player={lane:1,speed:6,score:0};
+let lanes=[30,150,270];
+let animation;
+let paused=false;
+let nitroActive=false;
 
-startBtn.addEventListener("click", startGame);
+let highScore=localStorage.getItem("cyberHighScore") || 0;
+highScoreDisplay.innerText=highScore;
 
-document.addEventListener("keydown", e=>{
-    if(e.key==="ArrowLeft" || e.key==="ArrowRight"){
-        keys[e.key]=true;
-    }
-});
-document.addEventListener("keyup", e=>{
-    if(e.key==="ArrowLeft" || e.key==="ArrowRight"){
-        keys[e.key]=false;
-    }
+document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowLeft" && player.lane>0) player.lane--;
+    if(e.key==="ArrowRight" && player.lane<2) player.lane++;
 });
 
 function startGame(){
-    gameArea.innerHTML="";
-    startBtn.style.display="none";
-    player.speed=5;
-    player.score=0;
+    gameArea.querySelectorAll(".enemy,.car").forEach(e=>e.remove());
 
-    for(let i=0;i<5;i++){
-        let roadLine=document.createElement("div");
-        roadLine.classList.add("roadLine");
-        roadLine.style.top=(i*150)+"px";
-        gameArea.appendChild(roadLine);
-    }
+    player.score=0;
+    player.speed=6;
+    player.lane=1;
 
     let car=document.createElement("div");
     car.classList.add("car");
     gameArea.appendChild(car);
 
-    player.x=car.offsetLeft;
-    player.y=car.offsetTop;
-
     for(let i=0;i<3;i++){
-        let enemy=document.createElement("div");
-        enemy.classList.add("enemy");
-        enemy.style.top=-(i*200)+"px";
-        enemy.style.left=Math.floor(Math.random()*350)+"px";
-        gameArea.appendChild(enemy);
+        createEnemy();
     }
 
-    window.requestAnimationFrame(playGame);
+    bgMusic.play();
+    paused=false;
+    animation=requestAnimationFrame(playGame);
+}
+
+function createEnemy(){
+    let enemy=document.createElement("div");
+    enemy.classList.add("enemy");
+    enemy.style.top="-120px";
+    enemy.dataset.lane=Math.floor(Math.random()*3);
+    enemy.style.left=lanes[enemy.dataset.lane]+"px";
+    gameArea.appendChild(enemy);
+}
+
+function playGame(){
+    if(paused) return;
+
+    let car=document.querySelector(".car");
+    car.style.left=lanes[player.lane]+"px";
+
+    document.querySelectorAll(".enemy").forEach(enemy=>{
+        let top=enemy.offsetTop;
+        if(top>650){
+            enemy.remove();
+            createEnemy();
+        }
+        enemy.style.top=(top+player.speed)+"px";
+
+        if(isCollide(car,enemy)){
+            endGame();
+        }
+    });
+
+    player.score++;
+    player.speed=6+Math.floor(player.score/500);
+    scoreDisplay.innerText=player.score;
+
+    animation=requestAnimationFrame(playGame);
 }
 
 function isCollide(a,b){
     let aRect=a.getBoundingClientRect();
     let bRect=b.getBoundingClientRect();
-    return !(aRect.bottom < bRect.top ||
-             aRect.top > bRect.bottom ||
-             aRect.right < bRect.left ||
-             aRect.left > bRect.right);
+    return !(aRect.bottom<bRect.top ||
+             aRect.top>bRect.bottom ||
+             aRect.right<bRect.left ||
+             aRect.left>bRect.right);
 }
 
-function moveRoadLines(){
-    let lines=document.querySelectorAll(".roadLine");
-    lines.forEach(line=>{
-        let top=line.offsetTop;
-        if(top>=600){
-            top-=750;
-        }
-        line.style.top=(top+player.speed)+"px";
-    });
+function activateNitro(){
+    if(nitroActive) return;
+    nitroActive=true;
+    player.speed+=5;
+    setTimeout(()=>{
+        player.speed-=5;
+        nitroActive=false;
+    },3000);
 }
 
-function moveEnemies(car){
-    let enemies=document.querySelectorAll(".enemy");
-    enemies.forEach(enemy=>{
-        if(isCollide(car,enemy)){
-            endGame();
-        }
-        let top=enemy.offsetTop;
-        if(top>=600){
-            top=-200;
-            enemy.style.left=Math.floor(Math.random()*350)+"px";
-        }
-        enemy.style.top=(top+player.speed)+"px";
-    });
-}
-
-function playGame(){
-    let car=document.querySelector(".car");
-
-    moveRoadLines();
-    moveEnemies(car);
-
-    if(keys.ArrowLeft && player.x>0){
-        player.x-=player.speed+2;
-    }
-    if(keys.ArrowRight && player.x<350){
-        player.x+=player.speed+2;
-    }
-
-    car.style.left=player.x+"px";
-
-    player.score++;
-    player.speed=5+Math.floor(player.score/500);
-    scoreDisplay.innerText="Score: "+player.score;
-
-    window.requestAnimationFrame(playGame);
+function togglePause(){
+    paused=!paused;
+    if(!paused) animation=requestAnimationFrame(playGame);
 }
 
 function endGame(){
-    alert("Game Over! Your Score: "+player.score);
-    startBtn.style.display="inline-block";
+    cancelAnimationFrame(animation);
+    bgMusic.pause();
+    if(player.score>highScore){
+        localStorage.setItem("cyberHighScore",player.score);
+        highScore=player.score;
+    }
+    highScoreDisplay.innerText=highScore;
+    alert("💥 Game Over! Score: "+player.score);
 }
 </script>
 
